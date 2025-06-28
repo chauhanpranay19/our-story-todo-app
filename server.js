@@ -208,6 +208,28 @@ app.put('/api/tasks/:id/undo', async (req, res) => {
   }
 });
 
+// Reorder tasks
+app.put('/api/tasks/reorder', async (req, res) => {
+  try {
+    const { order } = req.body;
+    const client = await pool.connect();
+    
+    // Update the order of tasks
+    for (let i = 0; i < order.length; i++) {
+      await client.query(
+        'UPDATE tasks SET created_at = $1 WHERE id = $2',
+        [new Date(Date.now() + i * 1000), order[i]]
+      );
+    }
+    
+    client.release();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error reordering tasks:', error);
+    res.status(500).json({ error: 'Failed to reorder tasks' });
+  }
+});
+
 // Delete task
 app.delete('/api/tasks/:id', async (req, res) => {
   try {
