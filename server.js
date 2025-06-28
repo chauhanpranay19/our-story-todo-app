@@ -4,7 +4,16 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+// Enhanced port detection for Railway
+const PORT = process.env.PORT || process.env.RAILWAY_STATIC_URL_PORT || process.env.RAILWAY_PORT || 3000;
+
+// Debug logging
+console.log('Environment variables:');
+console.log('- PORT:', process.env.PORT);
+console.log('- RAILWAY_STATIC_URL_PORT:', process.env.RAILWAY_STATIC_URL_PORT);
+console.log('- RAILWAY_PORT:', process.env.RAILWAY_PORT);
+console.log('Using PORT:', PORT);
 
 // Middleware
 app.use(cors());
