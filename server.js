@@ -61,25 +61,18 @@ async function initializeDatabase() {
     if (parseInt(taskCount.rows[0].count) === 0) {
       const initialTasks = [
         // Simple, everyday activities (start here)
-        "🤗 HUG", "☕ Buy the same tee", "🤝 Come up with an awesome handshake", "✍️ Write each other letters",
-        "🤫 Share a real and a big secret", "🍜 Eat from the same noodle bowl", "🥤 Drink something with two straws",
-        "😂 Take funny pictures", "🎤 Sing together wearing headphones", "💃 Dance on the streets",
-        
-        // Outdoor and social activities
-        "🌇 Watch the sunset together", "🚶 Go for a loonggg walk", "🕺 Slow dance", "🍿 Movie marathon",
-        "🌌 Stargazing", "🍦 Share the same ice cream", "💋 Kiss at midnight", "🎨 Try to make a sketch of the other person in 10 mins",
-        
-        // Creative and fun activities
-        "🛍️ Pick out each other's outfit", "💄 Let the other one do your makeup", "🎭 Try on each other's clothes",
-        "🚗 Go on an unplanned date", "💧 Kiss underwater", "😡 Eat something you hate", "🌸 Get a flower",
-        "🎥 Drive-in cinema", "🏊 Learn swimming", "🕺 Learn a dance together", "🏅 Learn a sport",
-        
-        // Cultural and learning activities
-        "🗣️ Learn 5 Korean words", "👗 Decide an outfit, purchase it and wear it for a dinner date",
-        "🤝 Share food with a needy person",
-        
-        // Big adventures and travel (save for later)
-        "✈️ Trip to London during Christmas", "🇲🇻 Sea of stars in the Maldives", "🪂 Skydiving", "💉 Get a tattoo"
+        "🤗 Hug", "🌸 Get a flower", "✍️ Write each other letters", "🤝 Share food to a needy",
+        "🍜 Eat same noodle", "🥤 Drink something with two straws", "😂 Take funny pictures",
+        "🚶 Go for a longggg walk", "🌇 Watch the sunset together", "🎤 Sing together any song wearing headphones",
+        "🌌 Stargazing", "🍦 Share same ice cream", "👗 Pick out each other's outfit", "👕 Buy same tee",
+        "👔 Try on each other's clothes", "🤝 Come up with an awesome handshake", "💃 Dance on the streets",
+        "🕺 Slow dance", "💋 Kiss at midnight", "🚪 Go to the same changing room", "🚗 Go on an unplanned date",
+        "🎨 Try to make a sketch of the other person in 10 mins", "🍿 Movie marathon",
+        "💄 Let the other one do your makeup however they want", "😡 Eat something you hate",
+        "🗣️ Learn 5 korean words", "🏅 Learn a sport", "🏊 Learn swimming", "🎥 Drive in cinema",
+        "🕺 Learn a dance together", "👗 Decide an outfit for the other person, purchase it and wear it as your dinner date outfit",
+        "🤫 Share a real and a big secret to the other person", "💧 Kiss underwater", "❄️ Go to the snowpark",
+        "💉 Get a tattoo", "🇲🇻 Sea of stars Maldives", "✈️ Trip to London during Christmas", "🪂 Skydiving"
       ];
       
       for (const taskText of initialTasks) {
