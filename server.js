@@ -10,11 +10,12 @@ const PORT = process.env.PORT || 3000;
 console.log('Environment variables:');
 console.log('- PORT:', process.env.PORT);
 console.log('- NODE_ENV:', process.env.NODE_ENV);
+console.log('- DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
 console.log('Using PORT:', PORT);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '.')));
 
 // Request logging
@@ -23,15 +24,43 @@ app.use((req, res, next) => {
   next();
 });
 
-// Database connection
-const pool = new Pool({
-  connectionString: 'postgresql://neondb_owner:npg_LRoBpjJvz01h@ep-tiny-thunder-aech14yn-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require'
-});
+// Database connection with better error handling
+let pool;
+try {
+  // Use environment variable if available, otherwise use hardcoded connection string
+  const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_LRoBpjJvz01h@ep-tiny-thunder-aech14yn-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require';
+  
+  pool = new Pool({
+    connectionString: connectionString,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  });
+
+  // Test the connection
+  pool.on('connect', () => {
+    console.log('Connected to database');
+  });
+
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+  });
+
+} catch (error) {
+  console.error('Database connection error:', error);
+}
 
 // Initialize database tables
 async function initializeDatabase() {
+  if (!pool) {
+    console.error('Database pool not initialized');
+    return;
+  }
+
   try {
     const client = await pool.connect();
+    console.log('Database client connected');
     
     // Create tasks table
     await client.query(`
@@ -44,6 +73,7 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('Tasks table ready');
     
     // Create journal table
     await client.query(`
@@ -55,10 +85,12 @@ async function initializeDatabase() {
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    console.log('Journal table ready');
     
     // Insert initial tasks if table is empty
     const taskCount = await client.query('SELECT COUNT(*) FROM tasks');
     if (parseInt(taskCount.rows[0].count) === 0) {
+      console.log('Inserting initial tasks...');
       const initialTasks = [
         // Simple, everyday activities (start here)
         "🤗 Hug", "🌸 Get a flower", "✍️ Write each other letters", "🤝 Share food to a needy",
@@ -78,12 +110,16 @@ async function initializeDatabase() {
       for (const taskText of initialTasks) {
         await client.query('INSERT INTO tasks (text) VALUES ($1)', [taskText]);
       }
+      console.log('Initial tasks inserted');
+    } else {
+      console.log('Tasks already exist, skipping initial insertion');
     }
     
     client.release();
     console.log('Database initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);
+    throw error;
   }
 }
 
@@ -91,6 +127,11 @@ async function initializeDatabase() {
 
 // Get all data
 app.get('/api/data', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const client = await pool.connect();
     
@@ -105,12 +146,17 @@ app.get('/api/data', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching data:', error);
-    res.status(500).json({ error: 'Failed to fetch data' });
+    res.status(500).json({ error: 'Failed to fetch data', details: error.message });
   }
 });
 
 // Save all data
 app.post('/api/data', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const { tasks, journal } = req.body;
     const client = await pool.connect();
@@ -139,34 +185,53 @@ app.post('/api/data', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving data:', error);
-    res.status(500).json({ error: 'Failed to save data' });
+    res.status(500).json({ error: 'Failed to save data', details: error.message });
   }
 });
 
 // Add new task
 app.post('/api/tasks', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const { text } = req.body;
+    if (!text || text.trim() === '') {
+      return res.status(400).json({ error: 'Task text is required' });
+    }
+
     const client = await pool.connect();
     
     const result = await client.query(
       'INSERT INTO tasks (text) VALUES ($1) RETURNING *',
-      [text]
+      [text.trim()]
     );
     
     client.release();
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error adding task:', error);
-    res.status(500).json({ error: 'Failed to add task' });
+    res.status(500).json({ error: 'Failed to add task', details: error.message });
   }
 });
 
 // Update task
 app.put('/api/tasks/:id', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const { id } = req.params;
     const { text, done, imageUrl, videoUrl } = req.body;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Task ID is required' });
+    }
+
     const client = await pool.connect();
     
     const result = await client.query(
@@ -174,18 +239,33 @@ app.put('/api/tasks/:id', async (req, res) => {
       [text, done, imageUrl, videoUrl, id]
     );
     
+    if (result.rows.length === 0) {
+      client.release();
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    
     client.release();
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating task:', error);
-    res.status(500).json({ error: 'Failed to update task' });
+    res.status(500).json({ error: 'Failed to update task', details: error.message });
   }
 });
 
 // Mark task as undone
 app.put('/api/tasks/:id/undo', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Task ID is required' });
+    }
+
     const client = await pool.connect();
     
     const result = await client.query(
@@ -193,18 +273,32 @@ app.put('/api/tasks/:id/undo', async (req, res) => {
       [id]
     );
     
+    if (result.rows.length === 0) {
+      client.release();
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    
     client.release();
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error undoing task:', error);
-    res.status(500).json({ error: 'Failed to undo task' });
+    res.status(500).json({ error: 'Failed to undo task', details: error.message });
   }
 });
 
 // Reorder tasks
 app.put('/api/tasks/reorder', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const { order } = req.body;
+    if (!order || !Array.isArray(order)) {
+      return res.status(400).json({ error: 'Order array is required' });
+    }
+
     const client = await pool.connect();
     
     // Update the order of tasks
@@ -219,30 +313,55 @@ app.put('/api/tasks/reorder', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error reordering tasks:', error);
-    res.status(500).json({ error: 'Failed to reorder tasks' });
+    res.status(500).json({ error: 'Failed to reorder tasks', details: error.message });
   }
 });
 
 // Delete task
 app.delete('/api/tasks/:id', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ error: 'Task ID is required' });
+    }
+
     const client = await pool.connect();
     
-    await client.query('DELETE FROM tasks WHERE id = $1', [id]);
+    const result = await client.query('DELETE FROM tasks WHERE id = $1 RETURNING *', [id]);
+    
+    if (result.rows.length === 0) {
+      client.release();
+      return res.status(404).json({ error: 'Task not found' });
+    }
     
     client.release();
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting task:', error);
-    res.status(500).json({ error: 'Failed to delete task' });
+    res.status(500).json({ error: 'Failed to delete task', details: error.message });
   }
 });
 
 // Add journal entry
 app.post('/api/journal', async (req, res) => {
+  if (!pool) {
+    console.error('Database pool not available');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   try {
     const { question, answer, author } = req.body;
+    
+    if (!question || !answer || !author) {
+      return res.status(400).json({ error: 'Question, answer, and author are required' });
+    }
+
     const client = await pool.connect();
     
     const result = await client.query(
@@ -254,7 +373,7 @@ app.post('/api/journal', async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error adding journal entry:', error);
-    res.status(500).json({ error: 'Failed to add journal entry' });
+    res.status(500).json({ error: 'Failed to add journal entry', details: error.message });
   }
 });
 
@@ -294,7 +413,17 @@ app.get('/health', (req, res) => {
     status: 'ok', 
     timestamp: new Date().toISOString(),
     port: PORT,
-    message: 'Our Story Todo App is running!'
+    message: 'Our Story Todo App is running!',
+    database: pool ? 'connected' : 'disconnected'
+  });
+});
+
+// Fallback endpoint for when database is not available
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'ok',
+    database: pool ? 'connected' : 'disconnected',
+    message: pool ? 'All features available' : 'Database features disabled'
   });
 });
 
@@ -304,27 +433,77 @@ app.get('/', (req, res) => {
 });
 
 // Initialize database and start server
-initializeDatabase().then(() => {
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`App available at: http://0.0.0.0:${PORT}`);
-    console.log('Health check available at: /health');
-  });
-  
-  // Error handling
-  server.on('error', (error) => {
-    console.error('Server error:', error);
-    if (error.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use`);
+async function startServer() {
+  try {
+    console.log('Starting server initialization...');
+    
+    // Try to initialize database
+    if (pool) {
+      await initializeDatabase();
+      console.log('Database initialized successfully');
+    } else {
+      console.warn('Database pool not available, starting in fallback mode');
     }
-  });
-  
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
+    
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`App available at: http://0.0.0.0:${PORT}`);
+      console.log('Health check available at: /health');
+      if (!pool) {
+        console.log('⚠️  Running in fallback mode - database features disabled');
+      }
     });
-  });
-}); 
+    
+    // Error handling
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use`);
+      }
+    });
+    
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received, shutting down gracefully');
+      server.close(() => {
+        console.log('Server closed');
+        if (pool) {
+          pool.end();
+        }
+        process.exit(0);
+      });
+    });
+    
+    process.on('SIGINT', () => {
+      console.log('SIGINT received, shutting down gracefully');
+      server.close(() => {
+        console.log('Server closed');
+        if (pool) {
+          pool.end();
+        }
+        process.exit(0);
+      });
+    });
+    
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    console.log('Starting server without database...');
+    
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT} (fallback mode)`);
+      console.log(`App available at: http://0.0.0.0:${PORT}`);
+      console.log('Health check available at: /health');
+      console.log('⚠️  Database features disabled due to initialization error');
+    });
+    
+    // Error handling
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use`);
+      }
+    });
+  }
+}
+
+startServer(); 
