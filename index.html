@@ -639,7 +639,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.95);
             z-index: 2000;
             display: flex;
             flex-direction: column;
@@ -684,12 +684,11 @@
         .rearrange-item {
             display: flex;
             align-items: center;
-            padding: 12px;
-            margin-bottom: 8px;
-            background: rgba(0, 0, 0, 0.3);
+            padding: 16px;
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.4);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            cursor: move;
+            border-radius: 12px;
             transition: var(--transition);
         }
 
@@ -698,20 +697,65 @@
             transform: translateX(4px);
         }
 
-        .rearrange-item.dragging {
-            opacity: 0.5;
-            transform: rotate(2deg);
-        }
-
-        .rearrange-handle {
-            font-size: 1.5rem;
-            margin-right: 12px;
-            color: var(--muted-text);
+        .rearrange-number {
+            background: var(--primary-red);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 16px;
+            flex-shrink: 0;
         }
 
         .rearrange-text {
             flex: 1;
             color: var(--light-text);
+            font-size: 1.1rem;
+            line-height: 1.4;
+        }
+
+        .rearrange-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-left: 16px;
+        }
+
+        .rearrange-btn-up, .rearrange-btn-down {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            color: var(--light-text);
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .rearrange-btn-up:hover, .rearrange-btn-down:hover {
+            background: var(--primary-red);
+            border-color: var(--primary-red);
+            transform: scale(1.05);
+        }
+
+        .rearrange-btn-up:disabled, .rearrange-btn-down:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .rearrange-btn-up:disabled:hover, .rearrange-btn-down:disabled:hover {
+            transform: none;
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border-color);
         }
 
         .rearrange-actions {
@@ -756,6 +800,53 @@
         @media (max-width: 768px) {
             .mobile-reorder {
                 display: block;
+            }
+        }
+
+        /* Mobile improvements for rearrange */
+        @media (max-width: 768px) {
+            .rearrange-mode {
+                padding: 15px;
+            }
+            
+            .rearrange-header h3 {
+                font-size: 1.3rem;
+            }
+            
+            .rearrange-item {
+                padding: 12px;
+                margin-bottom: 8px;
+            }
+            
+            .rearrange-number {
+                width: 25px;
+                height: 25px;
+                font-size: 0.9rem;
+                margin-right: 12px;
+            }
+            
+            .rearrange-text {
+                font-size: 1rem;
+            }
+            
+            .rearrange-controls {
+                gap: 6px;
+                margin-left: 12px;
+            }
+            
+            .rearrange-btn-up, .rearrange-btn-down {
+                width: 35px;
+                height: 35px;
+                font-size: 1rem;
+            }
+            
+            .rearrange-actions {
+                gap: 12px;
+            }
+            
+            .rearrange-btn-primary, .rearrange-btn-secondary {
+                padding: 10px 20px;
+                font-size: 0.9rem;
             }
         }
 
@@ -1920,9 +2011,13 @@
                 </div>
                 <div class="rearrange-list" id="rearrange-list">
                     ${appData.tasks.map((task, index) => `
-                        <div class="rearrange-item" data-task-id="${task.id}" draggable="true">
-                            <span class="rearrange-handle">⋮⋮</span>
-                            <span class="rearrange-text">${escapeHtml(task.text)}</span>
+                        <div class="rearrange-item" data-task-id="${task.id}" data-index="${index}">
+                            <div class="rearrange-number">${index + 1}</div>
+                            <div class="rearrange-text">${escapeHtml(task.text)}</div>
+                            <div class="rearrange-controls">
+                                <button class="rearrange-btn-up" ${index === 0 ? 'disabled' : ''} title="Move up">⬆️</button>
+                                <button class="rearrange-btn-down" ${index === appData.tasks.length - 1 ? 'disabled' : ''} title="Move down">⬇️</button>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
@@ -1934,37 +2029,67 @@
             
             document.body.appendChild(rearrangeOverlay);
             
-            // Set up drag and drop for rearrange
+            // Set up up/down button functionality
             const rearrangeList = document.getElementById('rearrange-list');
-            let draggedItem = null;
+            let currentTasks = [...appData.tasks]; // Copy the current tasks
             
-            // Drag events for each item
-            const rearrangeItems = rearrangeList.querySelectorAll('.rearrange-item');
-            rearrangeItems.forEach(item => {
-                item.addEventListener('dragstart', (e) => {
-                    draggedItem = item;
-                    item.classList.add('dragging');
-                    e.dataTransfer.effectAllowed = 'move';
+            // Function to update the display
+            function updateRearrangeDisplay() {
+                const items = rearrangeList.querySelectorAll('.rearrange-item');
+                items.forEach((item, index) => {
+                    const taskId = item.getAttribute('data-task-id');
+                    const task = currentTasks.find(t => t.id == taskId);
+                    if (task) {
+                        item.querySelector('.rearrange-number').textContent = index + 1;
+                        item.querySelector('.rearrange-text').textContent = task.text;
+                        
+                        // Update button states
+                        const upBtn = item.querySelector('.rearrange-btn-up');
+                        const downBtn = item.querySelector('.rearrange-btn-down');
+                        upBtn.disabled = index === 0;
+                        downBtn.disabled = index === currentTasks.length - 1;
+                    }
                 });
-                
-                item.addEventListener('dragend', () => {
-                    item.classList.remove('dragging');
-                    draggedItem = null;
-                });
-            });
+            }
             
-            // Drop zone events
-            rearrangeList.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                
-                const afterElement = getDragAfterElement(rearrangeList, e.clientY);
-                const draggable = document.querySelector('.dragging');
-                
-                if (afterElement == null) {
-                    rearrangeList.appendChild(draggable);
-                } else {
-                    rearrangeList.insertBefore(draggable, afterElement);
+            // Add event listeners for up/down buttons
+            rearrangeList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('rearrange-btn-up')) {
+                    const item = e.target.closest('.rearrange-item');
+                    const currentIndex = parseInt(item.getAttribute('data-index'));
+                    if (currentIndex > 0) {
+                        // Swap with previous item
+                        const temp = currentTasks[currentIndex];
+                        currentTasks[currentIndex] = currentTasks[currentIndex - 1];
+                        currentTasks[currentIndex - 1] = temp;
+                        
+                        // Update data-index attributes
+                        const items = rearrangeList.querySelectorAll('.rearrange-item');
+                        items.forEach((item, index) => {
+                            item.setAttribute('data-index', index);
+                        });
+                        
+                        updateRearrangeDisplay();
+                        showNotification('Item moved up! ⬆️', 'info');
+                    }
+                } else if (e.target.classList.contains('rearrange-btn-down')) {
+                    const item = e.target.closest('.rearrange-item');
+                    const currentIndex = parseInt(item.getAttribute('data-index'));
+                    if (currentIndex < currentTasks.length - 1) {
+                        // Swap with next item
+                        const temp = currentTasks[currentIndex];
+                        currentTasks[currentIndex] = currentTasks[currentIndex + 1];
+                        currentTasks[currentIndex + 1] = temp;
+                        
+                        // Update data-index attributes
+                        const items = rearrangeList.querySelectorAll('.rearrange-item');
+                        items.forEach((item, index) => {
+                            item.setAttribute('data-index', index);
+                        });
+                        
+                        updateRearrangeDisplay();
+                        showNotification('Item moved down! ⬇️', 'info');
+                    }
                 }
             });
             
@@ -1980,17 +2105,9 @@
             
             // Save button
             rearrangeOverlay.querySelector('#save-rearrange').addEventListener('click', async () => {
-                const newOrder = Array.from(rearrangeList.querySelectorAll('.rearrange-item'))
-                    .map(item => item.getAttribute('data-task-id'));
-                
                 try {
                     // Update the order in the app data
-                    const newTasks = [];
-                    newOrder.forEach(taskId => {
-                        const task = appData.tasks.find(t => t.id == taskId);
-                        if (task) newTasks.push(task);
-                    });
-                    appData.tasks = newTasks;
+                    appData.tasks = currentTasks;
                     
                     // Update order in database
                     await updateTaskOrder();
