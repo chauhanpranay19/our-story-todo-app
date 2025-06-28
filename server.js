@@ -215,8 +215,8 @@ app.get('/', (req, res) => {
 
 // Initialize database and start server
 initializeDatabase().then(() => {
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`App available at: http://localhost:${PORT}`);
+    console.log(`App available at: http://0.0.0.0:${PORT}`);
   });
 }); 
