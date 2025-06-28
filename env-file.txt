@@ -1,0 +1,15 @@
+# Environment Variables for Our Story To-Do List App
+# Rename this file to .env and import into Netlify Environment Variables
+
+# JSONBin Configuration (for data storage)
+# Get your keys from: https://jsonbin.io/
+JSONBIN_URL=https://api.jsonbin.io/v3/b/68601f3d8960c979a5b325f0
+JSONBIN_MASTER_KEY=$2a$10$Ki9xvslRt1vsFqqF6VUVle2Dg4CxKPzDGYC0hZKBUJrWvIPmggqzW
+
+# ImgBB Configuration (for image uploads)
+# Get your key from: https://imgbb.com/
+IMGBB_API_KEY=f619480b90cd80a6646b3c8d95872705
+
+# Optional: Custom Configuration
+APP_NAME=Our Story
+APP_VERSION=1.0.0 

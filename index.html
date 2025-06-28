@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Our To-Do List ❤️</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --dark-bg: #0d0000;
+            --primary-red: #ff6b6b;
+            --secondary-red: #ff8a8a;
+            --light-text: #e0e0e0;
+            --dark-text: #333;
+            --dark-accent: rgba(255, 255, 255, 0.05);
+            --dark-border: rgba(255, 100, 100, 0.2);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            color: var(--light-text);
+            background: linear-gradient(-45deg, #0d0000, #1a0000, #2b0f0f, #000000);
+            background-size: 400% 400%;
+            animation: gradientBG 20s ease infinite;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            overflow-x: hidden;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        #hearts-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+        }
+
+        .container {
+            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px);
+            padding: 25px 30px; border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); width: 95%; max-width: 600px;
+            z-index: 1; position: relative; border: 1px solid var(--dark-border);
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif; color: var(--primary-red);
+            text-align: center; font-size: 2.5rem; margin: 0 0 25px;
+            text-shadow: 0 0 15px rgba(255, 107, 107, 0.5);
+        }
+        
+        .accordion-item {
+            background: var(--dark-accent); border-radius: 15px; margin-bottom: 15px;
+            overflow: hidden; border: 1px solid rgba(255, 100, 100, 0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .accordion-header {
+            padding: 18px 20px; cursor: pointer; display: flex;
+            justify-content: space-between; align-items: center;
+            font-size: 1.3rem; font-weight: 600; color: var(--secondary-red);
+        }
+        .accordion-header:hover { background: rgba(255, 255, 255, 0.1); }
+        .accordion-header::after { content: '▼'; font-size: 0.8rem; transition: transform 0.4s ease; }
+        .accordion-item.active .accordion-header::after { transform: rotate(180deg); }
+
+        .accordion-content {
+            max-height: 0; overflow: hidden;
+            transition: max-height 0.6s ease-in-out, padding 0.6s ease-in-out;
+            padding: 0 20px;
+        }
+        .accordion-item.active .accordion-content {
+            max-height: 75vh; padding: 10px 20px 20px 20px; overflow-y: auto;
+        }
+
+        #task-form { display: flex; gap: 10px; margin-bottom: 20px; }
+        #task-input {
+            flex-grow: 1; background: rgba(0,0,0,0.3); color: #fff;
+            border: 1px solid rgba(255,100,100,0.3); border-radius: 30px;
+            padding: 10px 20px; font-size: 1rem;
+        }
+        #task-input::placeholder { color: #888; }
+        #task-input:focus { outline: none; border-color: var(--primary-red); }
+        #task-form button {
+            background: var(--primary-red); color: black; border: none; border-radius: 30px;
+            padding: 10px 20px; font-weight: 700; cursor: pointer; transition: background 0.3s;
+        }
+        #task-form button:hover { background: #ff4757; }
+
+        .task-list { list-style: none; padding: 0; margin: 0; }
+        .task-list li {
+            padding: 12px 15px; background: rgba(0,0,0,0.2); border-radius: 10px;
+            margin-bottom: 10px; display: flex; flex-direction: column;
+        }
+        .task-list-item-top { display: flex; align-items: center; justify-content: space-between; }
+        .task-content { display: flex; align-items: center; flex-grow: 1; word-break: break-word; cursor: pointer; }
+        .task-list .task-text { font-size: 1.1rem; }
+        .task-list .task-text::before { content: '♡'; color: var(--primary-red); font-size: 1.2rem; margin-right: 15px; }
+        .task-list li.done .task-text::before { content: '♥'; }
+        .task-list li.done .task-text { text-decoration: line-through; color: #888; }
+        
+        .delete-btn { background: none; border: none; color: var(--primary-red); font-size: 1.5rem; cursor: pointer; padding: 0 5px; opacity: 0.6; transition: opacity 0.3s; }
+        .delete-btn:hover { opacity: 1; }
+        .loading-text { color: var(--secondary-red); font-style: italic; margin-left: 10px; }
+        .task-image { width: 100%; border-radius: 8px; margin-top: 15px; }
+
+        #slideshow-container {
+            width: 100%; height: 300px; border-radius: 15px; overflow: hidden;
+            margin-bottom: 20px; position: relative; background: #000;
+        }
+        #slideshow-image {
+            width: 100%; height: 100%; object-fit: cover; position: absolute;
+            transition: opacity 1s ease-in-out;
+        }
+        #photos-gallery {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;
+        }
+        .gallery-item { position: relative; }
+        .gallery-item img {
+            width: 100%; height: 130px; object-fit: cover; border-radius: 10px;
+            border: 2px solid var(--dark-border); transition: transform 0.3s;
+        }
+        .gallery-item:hover img { transform: scale(1.05); }
+        .gallery-item-title {
+            position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7);
+            color: white; padding: 5px; font-size: 0.8rem; text-align: center;
+            border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+        .gallery-item:hover .gallery-item-title { opacity: 1; }
+
+        /* Journal Section UI */
+        #journal-question {
+            text-align: center; font-size: 1.2rem; margin-bottom: 20px;
+            color: #ffcdd2; font-weight: 600;
+        }
+        .journal-inputs { display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;}
+        .journal-entry {
+            background: rgba(0,0,0,0.3); border-radius: 10px; padding: 15px;
+            border-left: 4px solid var(--primary-red);
+        }
+         .journal-entry.her { border-left: 4px solid #f06292; }
+        .journal-entry label { font-weight: bold; color: var(--secondary-red); margin-bottom: 10px; display: block; }
+        .journal-entry.her label { color: #f06292; }
+
+        .journal-entry textarea {
+            width: 100%; background: transparent; border: none;
+            border-bottom: 1px solid rgba(255,100,100,0.4); color: #fff;
+            font-family: 'Poppins', sans-serif; font-size: 1rem; min-height: 40px;
+            resize: vertical; padding: 5px; margin-bottom: 10px;
+        }
+        .journal-entry textarea:focus { outline: none; }
+        .journal-entry button {
+            display: block; margin-left: auto; background: var(--primary-red); color: black;
+            border: none; border-radius: 20px; padding: 8px 15px; cursor: pointer;
+        }
+         .journal-entry.her button { background: #f06292; }
+
+        #journal-responses { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .journal-response {
+            padding: 10px 15px; border-radius: 15px; max-width: 80%;
+            background: #222;
+        }
+        .journal-response.him { align-self: flex-end; background: #3c0e0e; border-top-right-radius: 0; }
+        .journal-response.her { align-self: flex-start; background: #381f38; border-top-left-radius: 0; }
+
+        .response-meta { font-size: 0.8rem; color: #aaa; margin-bottom: 5px; font-weight: bold; }
+        .journal-response.him .response-meta { text-align: right; color: var(--secondary-red); }
+        .journal-response.her .response-meta { text-align: left; color: #f06292; }
+        .response-text { white-space: pre-wrap; }
+
+    </style>
+</head>
+<body>
+    <canvas id="hearts-canvas"></canvas>
+    <div class="container">
+        <h1>Our Story</h1>
+        
+        <div class="accordion">
+            <div class="accordion-item active">
+                <div class="accordion-header">Our Bucket List</div>
+                <div class="accordion-content">
+                    <form id="task-form"><input type="text" id="task-input" placeholder="Add a new dream..." required><button type="submit">Add</button></form>
+                    <ul id="task-list-todo" class="task-list"></ul>
+                </div>
+            </div>
+            
+             <div class="accordion-item">
+                <div class="accordion-header">Completed</div>
+                <div class="accordion-content">
+                    <ul id="task-list-completed" class="task-list"></ul>
+                </div>
+            </div>
+
+            <div class="accordion-item">
+                <div class="accordion-header">Photo Memories</div>
+                <div class="accordion-content">
+                    <div id="slideshow-container"><img id="slideshow-image"></div>
+                    <div id="photos-gallery"></div>
+                </div>
+            </div>
+            
+            <div class="accordion-item">
+                <div class="accordion-header">Our Journal</div>
+                <div class="accordion-content">
+                    <div id="journal-question"></div>
+                    <div class="journal-inputs">
+                        <div class="journal-entry him">
+                            <label>His Thoughts</label>
+                            <textarea id="journal-input-him" placeholder="..."></textarea>
+                            <button id="journal-submit-him">Save</button>
+                        </div>
+                        <div class="journal-entry her">
+                             <label>Her Thoughts</label>
+                            <textarea id="journal-input-her" placeholder="..."></textarea>
+                            <button id="journal-submit-her">Save</button>
+                        </div>
+                    </div>
+                    <div id="journal-responses"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // --- CONFIGURATION ---
+        // Backend API URL (will be localhost for development, your domain for production)
+        const API_BASE_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000/api' 
+            : '/api';
+        
+        // ImgBB API Key for image uploads
+        const IMGBB_API_KEY = "f619480b90cd80a6646b3c8d95872705";
+
+        // --- DOM ELEMENTS ---
+        const taskForm = document.getElementById('task-form');
+        const taskInput = document.getElementById('task-input');
+        const todoListEl = document.getElementById('task-list-todo');
+        const completedListEl = document.getElementById('task-list-completed');
+        const photosGallery = document.getElementById('photos-gallery');
+        const slideshowImage = document.getElementById('slideshow-image');
+        let appData = { tasks: [], journal: [] };
+
+        // --- Accordion Logic ---
+        document.querySelectorAll('.accordion-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const item = header.parentElement;
+                const isActive = item.classList.contains('active');
+                document.querySelectorAll('.accordion-item').forEach(i => i.classList.remove('active'));
+                if (!isActive) item.classList.add('active');
+            });
+        });
+        
+        // --- DATA HANDLING (DATABASE) ---
+        async function saveData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/data`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(appData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                console.log('Data saved successfully');
+            } catch (error) { 
+                console.error("Error saving data:", error);
+                showNotification('Failed to save data. Please try again.', 'error');
+            }
+        }
+
+        async function loadData() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/data`);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    appData = {
+                        tasks: data.tasks || [],
+                        journal: data.journal || []
+                    };
+                } else {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+            } catch (error) {
+                console.error("Error loading data:", error);
+                showNotification('Failed to load data. Using local fallback.', 'warning');
+                // Fallback to empty data if loading fails
+                appData = { tasks: [], journal: [] };
+            }
+            renderAll();
+        }
+
+        // --- NOTIFICATION SYSTEM ---
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 20px; right: 20px; padding: 15px 20px;
+                border-radius: 8px; color: white; font-weight: 600; z-index: 1000;
+                background: ${type === 'error' ? '#ff4757' : type === 'warning' ? '#ffa502' : '#2ed573'};
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3); transform: translateX(100%);
+                transition: transform 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.style.transform = 'translateX(0)', 100);
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 3000);
+        }
+
+        // --- RENDERING ---
+        function renderAll() {
+            renderTasks();
+            renderJournal();
+            renderPhotos();
+        }
+
+        function renderTasks() {
+            todoListEl.innerHTML = '';
+            completedListEl.innerHTML = '';
+            
+            if (!appData.tasks || appData.tasks.length === 0) {
+                todoListEl.innerHTML = '<li style="text-align: center; color: #888; padding: 20px;">No tasks yet. Add your first dream! 💫</li>';
+                return;
+            }
+            
+            appData.tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.id = task.id;
+                li.innerHTML = `<div class="task-list-item-top"><div class="task-content"><span class="task-text">${escapeHtml(task.text)}</span></div><button class="delete-btn">&times;</button></div>`;
+                
+                li.querySelector('.delete-btn').addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (confirm('Are you sure you want to delete this task?')) {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/tasks/${task.id}`, {
+                                method: 'DELETE'
+                            });
+                            if (response.ok) {
+                                appData.tasks = appData.tasks.filter(t => t.id !== task.id);
+                                renderAll();
+                                showNotification('Task deleted!', 'info');
+                            }
+                        } catch (error) {
+                            console.error('Error deleting task:', error);
+                            showNotification('Failed to delete task.', 'error');
+                        }
+                    }
+                });
+
+                if (task.done) {
+                    li.classList.add('done');
+                    if (task.image_url) {
+                        const img = document.createElement('img');
+                        img.src = task.image_url; 
+                        img.className = 'task-image';
+                        img.onerror = () => {
+                            img.style.display = 'none';
+                            console.warn('Failed to load image:', task.image_url);
+                        };
+                        li.appendChild(img);
+                    }
+                    completedListEl.prepend(li);
+                } else {
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file'; 
+                    fileInput.accept = 'image/*'; 
+                    fileInput.style.display = 'none';
+                    li.appendChild(fileInput);
+                    li.querySelector('.task-content').addEventListener('click', () => fileInput.click());
+                    fileInput.addEventListener('change', (e) => {
+                        if (e.target.files[0]) {
+                            const file = e.target.files[0];
+                            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                                showNotification('Image too large! Please choose a smaller file.', 'error');
+                                return;
+                            }
+                            completeTaskWithImage(task.id, file, li);
+                        }
+                    });
+                    todoListEl.append(li);
+                }
+            });
+        }
+        
+        // --- UTILITY FUNCTIONS ---
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        taskForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const taskText = taskInput.value.trim();
+            if(taskText) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/tasks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: taskText })
+                    });
+                    
+                    if (response.ok) {
+                        const newTask = await response.json();
+                        appData.tasks.push(newTask);
+                        renderTasks();
+                        taskInput.value = '';
+                        showNotification('New dream added! ✨', 'info');
+                    } else {
+                        throw new Error('Failed to add task');
+                    }
+                } catch (error) {
+                    console.error('Error adding task:', error);
+                    showNotification('Failed to add task. Please try again.', 'error');
+                }
+            }
+        });
+
+        // --- IMAGE HANDLING ---
+        async function completeTaskWithImage(taskId, file, li) {
+            const loadingText = document.createElement('span');
+            loadingText.className = 'loading-text'; 
+            loadingText.innerText = ' Uploading...';
+            li.querySelector('.task-content').appendChild(loadingText);
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { 
+                    method: 'POST', 
+                    body: formData 
+                });
+                
+                if (!res.ok) {
+                    throw new Error(`Upload failed: ${res.status}`);
+                }
+                
+                const json = await res.json();
+                if (json.success) {
+                    // Update task in database
+                    const updateResponse = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: appData.tasks.find(t => t.id === taskId).text,
+                            done: true,
+                            imageUrl: json.data.url
+                        })
+                    });
+                    
+                    if (updateResponse.ok) {
+                        const updatedTask = await updateResponse.json();
+                        const taskIndex = appData.tasks.findIndex(t => t.id === taskId);
+                        appData.tasks[taskIndex] = updatedTask;
+                        renderAll();
+                        showNotification('Task completed! 🎉', 'info');
+                    }
+                } else {
+                    throw new Error(json.error?.message || 'Upload failed');
+                }
+            } catch(error) {
+                console.error("Image upload failed:", error);
+                loadingText.innerText = " Upload Failed";
+                showNotification('Failed to upload image. Please try again.', 'error');
+            }
+        }
+        
+        // --- Photo Memories & Slideshow ---
+        let slideshowIndex = 0;
+        let slideshowInterval;
+        
+        function renderPhotos() {
+            const completedWithImages = appData.tasks.filter(t => t.done && t.image_url);
+            photosGallery.innerHTML = '';
+            
+            if (completedWithImages.length === 0) {
+                photosGallery.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">Complete some tasks with photos to see them here! 📸</div>';
+                return;
+            }
+            
+            completedWithImages.forEach(task => {
+                const galleryItem = document.createElement('div');
+                galleryItem.className = 'gallery-item';
+                galleryItem.innerHTML = `<img src="${task.image_url}" alt="${escapeHtml(task.text)}"><div class="gallery-item-title">${escapeHtml(task.text)}</div>`;
+                photosGallery.append(galleryItem);
+            });
+            
+            if (completedWithImages.length > 0 && !slideshowImage.src) {
+               runSlideshow(completedWithImages);
+            }
+        }
+        
+        function runSlideshow(images) {
+            if (!images || images.length === 0) return;
+            slideshowImage.style.opacity = '0';
+            setTimeout(() => {
+                slideshowImage.src = images[slideshowIndex].image_url;
+                slideshowImage.style.opacity = '1';
+                slideshowIndex = (slideshowIndex + 1) % images.length;
+            }, 1000);
+        }
+        
+        // Clear existing interval and start new one
+        if (slideshowInterval) clearInterval(slideshowInterval);
+        slideshowInterval = setInterval(() => {
+            const images = appData.tasks.filter(t => t.done && t.image_url);
+            runSlideshow(images);
+        }, 5000);
+
+        // --- Journal Logic ---
+        const journalQuestions = [
+            "What's one thing that made you smile today?", "What's a small thing your partner did that you appreciated?", "What's a song that reminds you of us right now?",
+            "If we could go anywhere tomorrow, where would we go?", "What's one new thing you learned today?", "Describe a perfect, lazy Sunday with me.",
+            "What's a challenge you faced today and how did you overcome it?", "What's your favorite memory of us from this month?"
+        ];
+        const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+        const currentQuestion = journalQuestions[dayOfYear % journalQuestions.length];
+        document.getElementById('journal-question').innerText = currentQuestion;
+
+        const setupJournalSubmit = (author) => {
+            const btn = document.getElementById(`journal-submit-${author}`);
+            const input = document.getElementById(`journal-input-${author}`);
+            btn.addEventListener('click', async () => {
+                const entryText = input.value.trim();
+                if (entryText) {
+                    try {
+                        const response = await fetch(`${API_BASE_URL}/journal`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                question: currentQuestion,
+                                answer: entryText,
+                                author: author
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            const newEntry = await response.json();
+                            if (!appData.journal) appData.journal = [];
+                            appData.journal.push(newEntry);
+                            renderJournal();
+                            input.value = '';
+                            showNotification('Journal entry saved! 📝', 'info');
+                        } else {
+                            throw new Error('Failed to save journal entry');
+                        }
+                    } catch (error) {
+                        console.error('Error saving journal entry:', error);
+                        showNotification('Failed to save journal entry. Please try again.', 'error');
+                    }
+                }
+            });
+        };
+        setupJournalSubmit('him');
+        setupJournalSubmit('her');
+
+        function renderJournal() {
+            const journalResponsesEl = document.getElementById('journal-responses');
+            journalResponsesEl.innerHTML = '';
+            
+            if (!appData.journal || appData.journal.length === 0) {
+                journalResponsesEl.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">Share your thoughts to start your journal! 💭</div>';
+                return;
+            }
+            
+            const sortedJournal = appData.journal.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            sortedJournal.forEach(entry => {
+                 const div = document.createElement('div');
+                 div.className = `journal-response ${entry.author}`;
+                 const date = new Date(entry.timestamp);
+                 const authorName = entry.author.charAt(0).toUpperCase() + entry.author.slice(1);
+                 div.innerHTML = `<div class="response-meta">${authorName} on ${date.toLocaleDateString()}</div><div class="response-text">${escapeHtml(entry.answer)}</div>`;
+                 journalResponsesEl.append(div);
+            });
+        }
+        
+        // --- Hearts Animation ---
+        const canvas = document.getElementById('hearts-canvas');
+        const ctx = canvas.getContext('2d');
+        let hearts = []; 
+        const numHearts = 15;
+        
+        function resizeCanvas() { 
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight; 
+        }
+        
+        class Heart {
+            constructor() { 
+                this.x = Math.random() * canvas.width; 
+                this.y = Math.random() * canvas.height; 
+                this.size = Math.random() * 12 + 6; 
+                this.speed = Math.random() * 0.8 + 0.2; 
+                this.opacity = Math.random() * 0.3 + 0.1; 
+                this.color = `rgba(255, 107, 107, ${this.opacity})`; 
+            }
+            update() { 
+                this.y += this.speed; 
+                if (this.y > canvas.height) { 
+                    this.y = 0 - this.size; 
+                    this.x = Math.random() * canvas.width; 
+                } 
+            }
+            draw() { 
+                ctx.beginPath(); 
+                ctx.moveTo(this.x, this.y + this.size / 4); 
+                ctx.quadraticCurveTo(this.x, this.y, this.x + this.size / 4, this.y); 
+                ctx.quadraticCurveTo(this.x + this.size / 2, this.y, this.x + this.size / 2, this.y + this.size / 4); 
+                ctx.quadraticCurveTo(this.x + this.size / 2, this.y, this.x + 3 * this.size / 4, this.y); 
+                ctx.quadraticCurveTo(this.x + this.size, this.y, this.x + this.size, this.y + this.size / 4); 
+                ctx.quadraticCurveTo(this.x + this.size, this.y + this.size / 2, this.x + this.size / 2, this.y + 3 * this.size / 4); 
+                ctx.quadraticCurveTo(this.x, this.y + this.size / 2, this.x, this.y + this.size / 4); 
+                ctx.fillStyle = this.color; 
+                ctx.fill(); 
+                ctx.closePath(); 
+            }
+        }
+        
+        function initHearts() { 
+            hearts = []; 
+            for (let i = 0; i < numHearts; i++) hearts.push(new Heart()); 
+        }
+        
+        function animate() { 
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            hearts.forEach(h => { 
+                h.update(); 
+                h.draw(); 
+            }); 
+            requestAnimationFrame(animate); 
+        }
+        
+        // Initial Load
+        window.onload = function() {
+            resizeCanvas();
+            initHearts();
+            animate();
+            loadData();
+        };
+        
+        window.addEventListener('resize', () => { 
+            resizeCanvas(); 
+            initHearts(); 
+        });
+
+    </script>
+</body>
+</html>
