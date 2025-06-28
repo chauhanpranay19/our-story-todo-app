@@ -1683,7 +1683,7 @@
 
         // --- IMAGE HANDLING ---
         async function completeTaskWithMedia(taskId, file, li) {
-            console.log('Starting media upload for task:', taskId, 'File:', file.name, 'Size:', file.size);
+            console.log('Starting media upload for task:', taskId, 'File:', file.name, 'Size:', file.size, 'Type:', file.type);
             
             const loadingText = document.createElement('span');
             loadingText.className = 'loading-text'; 
@@ -1696,8 +1696,13 @@
                 if (file.type.startsWith('image/') && file.size > 2 * 1024 * 1024) { // Compress if > 2MB
                     loadingText.innerText = ' Compressing...';
                     console.log('Compressing large image...');
-                    processedFile = await compressImage(file, 1920, 0.8);
-                    console.log('Image compressed:', file.size, '->', processedFile.size, 'bytes');
+                    try {
+                        processedFile = await compressImage(file, 1920, 0.8);
+                        console.log('Image compressed:', file.size, '->', processedFile.size, 'bytes');
+                    } catch (compressError) {
+                        console.warn('Compression failed, using original file:', compressError);
+                        processedFile = file;
+                    }
                 }
 
                 loadingText.innerText = ' Uploading...';
@@ -1705,52 +1710,23 @@
                 // Try Cloudinary first, fallback to base64 if it fails
                 let mediaUrl = null;
                 
-                try {
-                    console.log('Trying Cloudinary upload...');
-                    const formData = new FormData();
-                    formData.append('file', processedFile);
-                    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-                    formData.append('cloud_name', CLOUDINARY_CLOUD_NAME);
-                    
-                    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, { 
-                        method: 'POST', 
-                        body: formData 
-                    });
-                    
-                    console.log('Cloudinary response status:', res.status);
-                    
-                    if (res.ok) {
-                        const json = await res.json();
-                        console.log('Cloudinary response:', json);
-                        
-                        if (json.secure_url) {
-                            mediaUrl = json.secure_url;
-                            console.log('Cloudinary upload successful:', mediaUrl);
-                        } else {
-                            throw new Error('Cloudinary upload failed - no URL returned');
-                        }
-                    } else {
-                        const errorText = await res.text();
-                        console.warn('Cloudinary error response:', errorText);
-                        throw new Error(`Cloudinary upload failed: ${res.status} - ${errorText}`);
-                    }
-                } catch (cloudinaryError) {
-                    console.warn('Cloudinary upload failed, falling back to base64:', cloudinaryError);
-                    
-                    // Fallback to base64 for files up to 25MB (increased due to compression)
-                    const maxSize = 25 * 1024 * 1024; // 25MB
-                    
-                    if (processedFile.size > maxSize) {
-                        throw new Error(`File too large (${(processedFile.size / 1024 / 1024).toFixed(1)}MB). Please try a file smaller than 25MB.`);
-                    }
-
-                    // Convert file to base64
-                    console.log('Converting file to base64...');
-                    mediaUrl = await fileToBase64(processedFile);
-                    console.log('Base64 conversion successful, size:', mediaUrl.length);
+                // For now, skip Cloudinary and use base64 directly for better reliability
+                console.log('Using base64 upload for better reliability...');
+                
+                // Fallback to base64 for files up to 25MB (increased due to compression)
+                const maxSize = 25 * 1024 * 1024; // 25MB
+                
+                if (processedFile.size > maxSize) {
+                    throw new Error(`File too large (${(processedFile.size / 1024 / 1024).toFixed(1)}MB). Please try a file smaller than 25MB.`);
                 }
+
+                // Convert file to base64
+                console.log('Converting file to base64...');
+                mediaUrl = await fileToBase64(processedFile);
+                console.log('Base64 conversion successful, size:', mediaUrl.length);
                 
                 // Update task in database
+                console.log('Updating task in database...');
                 const updateResponse = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -1772,7 +1748,9 @@
                     renderAll();
                     showNotification('Item completed! 🎉', 'info');
                 } else {
-                    throw new Error('Failed to update task in database');
+                    const errorText = await updateResponse.text();
+                    console.error('Database update failed:', errorText);
+                    throw new Error(`Failed to update task in database: ${updateResponse.status} - ${errorText}`);
                 }
                 
             } catch(error) {
@@ -2135,6 +2113,28 @@
             } catch (error) {
                 console.error('Recovery failed:', error);
                 showNotification('Recovery failed. Please refresh the page.', 'error');
+            }
+        }
+
+        // Helper function to test Cloudinary connection
+        async function testCloudinary() {
+            try {
+                console.log('Testing Cloudinary connection...');
+                const testResponse = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        upload_preset: CLOUDINARY_UPLOAD_PRESET,
+                        cloud_name: CLOUDINARY_CLOUD_NAME
+                    })
+                });
+                console.log('Cloudinary test response:', testResponse.status);
+                return testResponse.ok;
+            } catch (error) {
+                console.error('Cloudinary test failed:', error);
+                return false;
             }
         }
 
