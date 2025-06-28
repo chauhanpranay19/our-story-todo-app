@@ -1463,17 +1463,12 @@
                 li.id = task.id;
 
                 if (task.done) {
+                    // Completed tasks - no rearrange button, no file upload
                     li.classList.add('done');
-                    const taskIndex = appData.tasks.findIndex(t => t.id === task.id);
-                    const isFirst = taskIndex === 0;
-                    const isLast = taskIndex === appData.tasks.length - 1;
                     
                     li.innerHTML = `
                         <div class="task-list-item-top">
                             <div class="task-content">
-                                <div class="mobile-reorder">
-                                    <button class="rearrange-btn" title="Rearrange">🔄</button>
-                                </div>
                                 <span class="task-text">${escapeHtml(task.text)}</span>
                             </div>
                             <div class="task-actions">
@@ -1512,58 +1507,27 @@
                         }
                     });
                     
-                    completedListEl.prepend(li);
-                } else {
-                    const taskIndex = appData.tasks.findIndex(t => t.id === task.id);
-                    const isFirst = taskIndex === 0;
-                    const isLast = taskIndex === appData.tasks.length - 1;
-                    
-                    li.innerHTML = `
-                        <div class="task-list-item-top">
-                            <div class="task-content">
-                                <div class="mobile-reorder">
-                                    <button class="rearrange-btn" title="Rearrange">🔄</button>
-                                </div>
-                                <span class="task-text">${escapeHtml(task.text)}</span>
-                            </div>
-                            <div class="task-actions">
-                                <button class="edit-btn" title="Edit">✏️</button>
-                                <button class="delete-btn">&times;</button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Add rearrange functionality
-                    const rearrangeBtn = li.querySelector('.rearrange-btn');
-                    rearrangeBtn.addEventListener('click', (e) => {
+                    // Add delete functionality
+                    li.querySelector('.delete-btn').addEventListener('click', async (e) => {
                         e.stopPropagation();
-                        openRearrangeMode();
-                    });
-                    
-                    // Add edit functionality
-                    li.querySelector('.edit-btn').addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        enableTaskEdit(li, task);
-                    });
-                    
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file'; 
-                    fileInput.accept = 'image/*,video/*'; 
-                    fileInput.style.display = 'none';
-                    li.appendChild(fileInput);
-                    li.querySelector('.task-content').addEventListener('click', () => fileInput.click());
-                    fileInput.addEventListener('change', (e) => {
-                        if (e.target.files[0]) {
-                            const file = e.target.files[0];
-                            if (file.size > 50 * 1024 * 1024) { // 50MB limit for videos
-                                showNotification('File too large! Please choose a smaller file.', 'error');
-                                return;
+                        if (confirm('Are you sure you want to delete this item?')) {
+                            try {
+                                const response = await fetch(`${API_BASE_URL}/tasks/${task.id}`, {
+                                    method: 'DELETE'
+                                });
+                                if (response.ok) {
+                                    appData.tasks = appData.tasks.filter(t => t.id !== task.id);
+                                    renderAll();
+                                    showNotification('Item deleted!', 'info');
+                                }
+                            } catch (error) {
+                                console.error('Error deleting task:', error);
+                                showNotification('Failed to delete item.', 'error');
                             }
-                            completeTaskWithMedia(task.id, file, li);
                         }
                     });
                     
-                    // Add media content
+                    // Add media content for completed tasks
                     if (task.image_url) {
                         const img = document.createElement('img');
                         img.src = task.image_url; 
@@ -1587,28 +1551,90 @@
                         li.appendChild(video);
                     }
                     
+                    completedListEl.prepend(li);
+                } else {
+                    // Active tasks - with rearrange button and file upload
+                    li.innerHTML = `
+                        <div class="task-list-item-top">
+                            <div class="task-content">
+                                <div class="mobile-reorder">
+                                    <button class="rearrange-btn" title="Rearrange">🔄</button>
+                                </div>
+                                <span class="task-text">${escapeHtml(task.text)}</span>
+                            </div>
+                            <div class="task-actions">
+                                <button class="edit-btn" title="Edit">✏️</button>
+                                <button class="delete-btn">&times;</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add rearrange functionality
+                    const rearrangeBtn = li.querySelector('.rearrange-btn');
+                    if (rearrangeBtn) {
+                        rearrangeBtn.addEventListener('click', (e) => {
+                            console.log('Rearrange button clicked!');
+                            e.stopPropagation();
+                            openRearrangeMode();
+                        });
+                    }
+                    
+                    // Add edit functionality
+                    li.querySelector('.edit-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        enableTaskEdit(li, task);
+                    });
+                    
+                    // Add delete functionality
+                    li.querySelector('.delete-btn').addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        if (confirm('Are you sure you want to delete this item?')) {
+                            try {
+                                const response = await fetch(`${API_BASE_URL}/tasks/${task.id}`, {
+                                    method: 'DELETE'
+                                });
+                                if (response.ok) {
+                                    appData.tasks = appData.tasks.filter(t => t.id !== task.id);
+                                    renderAll();
+                                    showNotification('Item deleted!', 'info');
+                                }
+                            } catch (error) {
+                                console.error('Error deleting task:', error);
+                                showNotification('Failed to delete item.', 'error');
+                            }
+                        }
+                    });
+                    
+                    // Create file input for upload
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file'; 
+                    fileInput.accept = 'image/*,video/*'; 
+                    fileInput.style.display = 'none';
+                    li.appendChild(fileInput);
+                    
+                    // Add click event to task content for file upload (but not to buttons)
+                    const taskContent = li.querySelector('.task-content');
+                    taskContent.addEventListener('click', (e) => {
+                        // Don't trigger file input if clicking on buttons or rearrange button
+                        if (e.target.closest('.task-actions') || e.target.closest('.rearrange-btn')) {
+                            return;
+                        }
+                        fileInput.click();
+                    });
+                    
+                    fileInput.addEventListener('change', (e) => {
+                        if (e.target.files[0]) {
+                            const file = e.target.files[0];
+                            if (file.size > 50 * 1024 * 1024) { // 50MB limit for videos
+                                showNotification('File too large! Please choose a smaller file.', 'error');
+                                return;
+                            }
+                            completeTaskWithMedia(task.id, file, li);
+                        }
+                    });
+                    
                     todoListEl.append(li);
                 }
-                
-                // Delete functionality
-                li.querySelector('.delete-btn').addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    if (confirm('Are you sure you want to delete this item?')) {
-                        try {
-                            const response = await fetch(`${API_BASE_URL}/tasks/${task.id}`, {
-                                method: 'DELETE'
-                            });
-                            if (response.ok) {
-                                appData.tasks = appData.tasks.filter(t => t.id !== task.id);
-                                renderAll();
-                                showNotification('Item deleted!', 'info');
-                            }
-                        } catch (error) {
-                            console.error('Error deleting task:', error);
-                            showNotification('Failed to delete item.', 'error');
-                        }
-                    }
-                });
             });
             
             // Initialize drag and drop after rendering
@@ -1653,6 +1679,8 @@
 
         // --- IMAGE HANDLING ---
         async function completeTaskWithMedia(taskId, file, li) {
+            console.log('Starting media upload for task:', taskId, 'File:', file.name, 'Size:', file.size);
+            
             const loadingText = document.createElement('span');
             loadingText.className = 'loading-text'; 
             loadingText.innerText = ' Uploading...';
@@ -1662,17 +1690,23 @@
             formData.append('image', file);
 
             try {
+                console.log('Uploading to ImgBB...');
                 const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { 
                     method: 'POST', 
                     body: formData 
                 });
+                
+                console.log('ImgBB response status:', res.status);
                 
                 if (!res.ok) {
                     throw new Error(`Upload failed: ${res.status}`);
                 }
                 
                 const json = await res.json();
+                console.log('ImgBB response:', json);
+                
                 if (json.success) {
+                    console.log('ImgBB upload successful, updating task...');
                     // Update task in database
                     const updateResponse = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
                         method: 'PUT',
@@ -1685,12 +1719,17 @@
                         })
                     });
                     
+                    console.log('Task update response status:', updateResponse.status);
+                    
                     if (updateResponse.ok) {
                         const updatedTask = await updateResponse.json();
+                        console.log('Task updated successfully:', updatedTask);
                         const taskIndex = appData.tasks.findIndex(t => t.id === taskId);
                         appData.tasks[taskIndex] = updatedTask;
                         renderAll();
                         showNotification('Item completed! 🎉', 'info');
+                    } else {
+                        throw new Error('Failed to update task in database');
                     }
                 } else {
                     throw new Error(json.error?.message || 'Upload failed');
@@ -1997,137 +2036,6 @@
                 console.error('Recovery failed:', error);
                 showNotification('Recovery failed. Please refresh the page.', 'error');
             }
-        }
-
-        // --- REARRANGE FUNCTIONALITY ---
-        function openRearrangeMode() {
-            // Create rearrange mode overlay
-            const rearrangeOverlay = document.createElement('div');
-            rearrangeOverlay.className = 'rearrange-mode';
-            rearrangeOverlay.innerHTML = `
-                <div class="rearrange-header">
-                    <h3>Rearrange Bucket List</h3>
-                    <button class="rearrange-close">&times;</button>
-                </div>
-                <div class="rearrange-list" id="rearrange-list">
-                    ${appData.tasks.map((task, index) => `
-                        <div class="rearrange-item" data-task-id="${task.id}" data-index="${index}">
-                            <div class="rearrange-number">${index + 1}</div>
-                            <div class="rearrange-text">${escapeHtml(task.text)}</div>
-                            <div class="rearrange-controls">
-                                <button class="rearrange-btn-up" ${index === 0 ? 'disabled' : ''} title="Move up">⬆️</button>
-                                <button class="rearrange-btn-down" ${index === appData.tasks.length - 1 ? 'disabled' : ''} title="Move down">⬇️</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="rearrange-actions">
-                    <button class="rearrange-btn-secondary" id="cancel-rearrange">Cancel</button>
-                    <button class="rearrange-btn-primary" id="save-rearrange">Save Order</button>
-                </div>
-            `;
-            
-            document.body.appendChild(rearrangeOverlay);
-            
-            // Set up up/down button functionality
-            const rearrangeList = document.getElementById('rearrange-list');
-            let currentTasks = [...appData.tasks]; // Copy the current tasks
-            
-            // Function to update the display
-            function updateRearrangeDisplay() {
-                const items = rearrangeList.querySelectorAll('.rearrange-item');
-                items.forEach((item, index) => {
-                    const taskId = item.getAttribute('data-task-id');
-                    const task = currentTasks.find(t => t.id == taskId);
-                    if (task) {
-                        item.querySelector('.rearrange-number').textContent = index + 1;
-                        item.querySelector('.rearrange-text').textContent = task.text;
-                        
-                        // Update button states
-                        const upBtn = item.querySelector('.rearrange-btn-up');
-                        const downBtn = item.querySelector('.rearrange-btn-down');
-                        upBtn.disabled = index === 0;
-                        downBtn.disabled = index === currentTasks.length - 1;
-                    }
-                });
-            }
-            
-            // Add event listeners for up/down buttons
-            rearrangeList.addEventListener('click', (e) => {
-                if (e.target.classList.contains('rearrange-btn-up')) {
-                    const item = e.target.closest('.rearrange-item');
-                    const currentIndex = parseInt(item.getAttribute('data-index'));
-                    if (currentIndex > 0) {
-                        // Swap with previous item
-                        const temp = currentTasks[currentIndex];
-                        currentTasks[currentIndex] = currentTasks[currentIndex - 1];
-                        currentTasks[currentIndex - 1] = temp;
-                        
-                        // Update data-index attributes
-                        const items = rearrangeList.querySelectorAll('.rearrange-item');
-                        items.forEach((item, index) => {
-                            item.setAttribute('data-index', index);
-                        });
-                        
-                        updateRearrangeDisplay();
-                        showNotification('Item moved up! ⬆️', 'info');
-                    }
-                } else if (e.target.classList.contains('rearrange-btn-down')) {
-                    const item = e.target.closest('.rearrange-item');
-                    const currentIndex = parseInt(item.getAttribute('data-index'));
-                    if (currentIndex < currentTasks.length - 1) {
-                        // Swap with next item
-                        const temp = currentTasks[currentIndex];
-                        currentTasks[currentIndex] = currentTasks[currentIndex + 1];
-                        currentTasks[currentIndex + 1] = temp;
-                        
-                        // Update data-index attributes
-                        const items = rearrangeList.querySelectorAll('.rearrange-item');
-                        items.forEach((item, index) => {
-                            item.setAttribute('data-index', index);
-                        });
-                        
-                        updateRearrangeDisplay();
-                        showNotification('Item moved down! ⬇️', 'info');
-                    }
-                }
-            });
-            
-            // Close button
-            rearrangeOverlay.querySelector('.rearrange-close').addEventListener('click', () => {
-                document.body.removeChild(rearrangeOverlay);
-            });
-            
-            // Cancel button
-            rearrangeOverlay.querySelector('#cancel-rearrange').addEventListener('click', () => {
-                document.body.removeChild(rearrangeOverlay);
-            });
-            
-            // Save button
-            rearrangeOverlay.querySelector('#save-rearrange').addEventListener('click', async () => {
-                try {
-                    // Update the order in the app data
-                    appData.tasks = currentTasks;
-                    
-                    // Update order in database
-                    await updateTaskOrder();
-                    renderTasks();
-                    showNotification('Order saved successfully! ✨', 'info');
-                    document.body.removeChild(rearrangeOverlay);
-                } catch (error) {
-                    console.error('Error saving order:', error);
-                    showNotification('Failed to save order. Please try again.', 'error');
-                }
-            });
-            
-            // Escape key to close
-            const handleEscape = (e) => {
-                if (e.key === 'Escape') {
-                    document.body.removeChild(rearrangeOverlay);
-                    document.removeEventListener('keydown', handleEscape);
-                }
-            };
-            document.addEventListener('keydown', handleEscape);
         }
 
     </script>
