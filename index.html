@@ -1626,8 +1626,11 @@
                     fileInput.addEventListener('change', (e) => {
                         if (e.target.files[0]) {
                             const file = e.target.files[0];
-                            if (file.size > 50 * 1024 * 1024) { // 50MB limit for videos
-                                showNotification('File too large! Please choose a smaller file.', 'error');
+                            const maxSize = 25 * 1024 * 1024; // 25MB limit (increased due to compression)
+                            
+                            if (file.size > maxSize) {
+                                const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+                                showNotification(`File too large (${fileSizeMB}MB)! Please choose a file smaller than 25MB.`, 'error');
                                 return;
                             }
                             completeTaskWithMedia(task.id, file, li);
@@ -1684,17 +1687,28 @@
             
             const loadingText = document.createElement('span');
             loadingText.className = 'loading-text'; 
-            loadingText.innerText = ' Uploading...';
+            loadingText.innerText = ' Processing...';
             li.querySelector('.task-content').appendChild(loadingText);
 
             try {
+                // Compress image if it's large (only for images, not videos)
+                let processedFile = file;
+                if (file.type.startsWith('image/') && file.size > 2 * 1024 * 1024) { // Compress if > 2MB
+                    loadingText.innerText = ' Compressing...';
+                    console.log('Compressing large image...');
+                    processedFile = await compressImage(file, 1920, 0.8);
+                    console.log('Image compressed:', file.size, '->', processedFile.size, 'bytes');
+                }
+
+                loadingText.innerText = ' Uploading...';
+                
                 // Try Cloudinary first, fallback to base64 if it fails
                 let mediaUrl = null;
                 
                 try {
                     console.log('Trying Cloudinary upload...');
                     const formData = new FormData();
-                    formData.append('file', file);
+                    formData.append('file', processedFile);
                     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
                     formData.append('cloud_name', CLOUDINARY_CLOUD_NAME);
                     
@@ -1717,21 +1731,23 @@
                         }
                     } else {
                         const errorText = await res.text();
+                        console.warn('Cloudinary error response:', errorText);
                         throw new Error(`Cloudinary upload failed: ${res.status} - ${errorText}`);
                     }
                 } catch (cloudinaryError) {
                     console.warn('Cloudinary upload failed, falling back to base64:', cloudinaryError);
                     
-                    // Fallback to base64 for smaller files
-                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    // Fallback to base64 for files up to 25MB (increased due to compression)
+                    const maxSize = 25 * 1024 * 1024; // 25MB
                     
-                    if (file.size > maxSize) {
-                        throw new Error('File too large for fallback. Please try a smaller file or check your internet connection.');
+                    if (processedFile.size > maxSize) {
+                        throw new Error(`File too large (${(processedFile.size / 1024 / 1024).toFixed(1)}MB). Please try a file smaller than 25MB.`);
                     }
 
                     // Convert file to base64
-                    mediaUrl = await fileToBase64(file);
-                    console.log('Using base64 fallback, size:', mediaUrl.length);
+                    console.log('Converting file to base64...');
+                    mediaUrl = await fileToBase64(processedFile);
+                    console.log('Base64 conversion successful, size:', mediaUrl.length);
                 }
                 
                 // Update task in database
@@ -1773,6 +1789,55 @@
                 reader.readAsDataURL(file);
                 reader.onload = () => resolve(reader.result);
                 reader.onerror = error => reject(error);
+            });
+        }
+
+        // Helper function to compress images
+        function compressImage(file, maxWidth = 1920, quality = 0.8) {
+            return new Promise((resolve, reject) => {
+                // Only compress images, not videos
+                if (!file.type.startsWith('image/')) {
+                    resolve(file);
+                    return;
+                }
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                img.onload = () => {
+                    // Calculate new dimensions while maintaining aspect ratio
+                    let { width, height } = img;
+                    
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+
+                    // Set canvas dimensions
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // Draw and compress image
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Convert to blob with compression
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            // Create a new file with compressed data
+                            const compressedFile = new File([blob], file.name, {
+                                type: file.type,
+                                lastModified: Date.now()
+                            });
+                            resolve(compressedFile);
+                        } else {
+                            reject(new Error('Failed to compress image'));
+                        }
+                    }, file.type, quality);
+                };
+
+                img.onerror = () => reject(new Error('Failed to load image for compression'));
+                img.src = URL.createObjectURL(file);
             });
         }
         
