@@ -40,6 +40,7 @@ async function initializeDatabase() {
         text TEXT NOT NULL,
         done BOOLEAN DEFAULT FALSE,
         image_url TEXT,
+        video_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -59,13 +60,25 @@ async function initializeDatabase() {
     const taskCount = await client.query('SELECT COUNT(*) FROM tasks');
     if (parseInt(taskCount.rows[0].count) === 0) {
       const initialTasks = [
-        "☕ Buy the same tee", "🤝 Come up with an awesome handshake", "✍️ Write each other letters", "🤫 Share a real and a big secret",
-        "🍜 Eat from the same noodle bowl", "🥤 Drink something with two straws", "😂 Take funny pictures", "🎤 Sing together wearing headphones",
-        "💃 Dance on the streets", "🤗 HUG", "🌇 Watch the sunset together", "🍿 Movie marathon", "🌌 Stargazing", "🍦 Share the same ice cream",
-        "🚶 Go for a loonggg walk", "🕺 Slow dance", "💋 Kiss at midnight", "🎨 Try to make a sketch of the other person in 10 mins",
-        "🛍️ Pick out each other's outfit", "💄 Let the other one do your makeup", "🤝 Share food with a needy person", "🎭 Try on each other's clothes",
-        "🚗 Go on an unplanned date", "💧 Kiss underwater", "😡 Eat something you hate", "🌸 Get a flower", "🎥 Drive-in cinema", "🏊 Learn swimming",
-        "🕺 Learn a dance together", "🏅 Learn a sport", "🗣️ Learn 5 Korean words", "👗 Decide an outfit, purchase it and wear it for a dinner date",
+        // Simple, everyday activities (start here)
+        "🤗 HUG", "☕ Buy the same tee", "🤝 Come up with an awesome handshake", "✍️ Write each other letters",
+        "🤫 Share a real and a big secret", "🍜 Eat from the same noodle bowl", "🥤 Drink something with two straws",
+        "😂 Take funny pictures", "🎤 Sing together wearing headphones", "💃 Dance on the streets",
+        
+        // Outdoor and social activities
+        "🌇 Watch the sunset together", "🚶 Go for a loonggg walk", "🕺 Slow dance", "🍿 Movie marathon",
+        "🌌 Stargazing", "🍦 Share the same ice cream", "💋 Kiss at midnight", "🎨 Try to make a sketch of the other person in 10 mins",
+        
+        // Creative and fun activities
+        "🛍️ Pick out each other's outfit", "💄 Let the other one do your makeup", "🎭 Try on each other's clothes",
+        "🚗 Go on an unplanned date", "💧 Kiss underwater", "😡 Eat something you hate", "🌸 Get a flower",
+        "🎥 Drive-in cinema", "🏊 Learn swimming", "🕺 Learn a dance together", "🏅 Learn a sport",
+        
+        // Cultural and learning activities
+        "🗣️ Learn 5 Korean words", "👗 Decide an outfit, purchase it and wear it for a dinner date",
+        "🤝 Share food with a needy person",
+        
+        // Big adventures and travel (save for later)
         "✈️ Trip to London during Christmas", "🇲🇻 Sea of stars in the Maldives", "🪂 Skydiving", "💉 Get a tattoo"
       ];
       
@@ -116,8 +129,8 @@ app.post('/api/data', async (req, res) => {
     // Insert tasks
     for (const task of tasks) {
       await client.query(
-        'INSERT INTO tasks (id, text, done, image_url) VALUES ($1, $2, $3, $4)',
-        [task.id, task.text, task.done, task.imageUrl]
+        'INSERT INTO tasks (id, text, done, image_url, video_url) VALUES ($1, $2, $3, $4, $5)',
+        [task.id, task.text, task.done, task.imageUrl, task.videoUrl]
       );
     }
     
@@ -160,12 +173,12 @@ app.post('/api/tasks', async (req, res) => {
 app.put('/api/tasks/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { text, done, imageUrl } = req.body;
+    const { text, done, imageUrl, videoUrl } = req.body;
     const client = await pool.connect();
     
     const result = await client.query(
-      'UPDATE tasks SET text = $1, done = $2, image_url = $3 WHERE id = $4 RETURNING *',
-      [text, done, imageUrl, id]
+      'UPDATE tasks SET text = $1, done = $2, image_url = $3, video_url = $4 WHERE id = $5 RETURNING *',
+      [text, done, imageUrl, videoUrl, id]
     );
     
     client.release();
@@ -173,6 +186,25 @@ app.put('/api/tasks/:id', async (req, res) => {
   } catch (error) {
     console.error('Error updating task:', error);
     res.status(500).json({ error: 'Failed to update task' });
+  }
+});
+
+// Mark task as undone
+app.put('/api/tasks/:id/undo', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const client = await pool.connect();
+    
+    const result = await client.query(
+      'UPDATE tasks SET done = FALSE, image_url = NULL, video_url = NULL WHERE id = $1 RETURNING *',
+      [id]
+    );
+    
+    client.release();
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error undoing task:', error);
+    res.status(500).json({ error: 'Failed to undo task' });
   }
 });
 
@@ -208,6 +240,36 @@ app.post('/api/journal', async (req, res) => {
   } catch (error) {
     console.error('Error adding journal entry:', error);
     res.status(500).json({ error: 'Failed to add journal entry' });
+  }
+});
+
+// Get journal history
+app.get('/api/journal/history', async (req, res) => {
+  try {
+    const client = await pool.connect();
+    
+    const result = await client.query(`
+      SELECT 
+        DATE(timestamp) as date,
+        question,
+        json_agg(
+          json_build_object(
+            'id', id,
+            'answer', answer,
+            'author', author,
+            'timestamp', timestamp
+          ) ORDER BY timestamp
+        ) as entries
+      FROM journal 
+      GROUP BY DATE(timestamp), question
+      ORDER BY date DESC, question
+    `);
+    
+    client.release();
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching journal history:', error);
+    res.status(500).json({ error: 'Failed to fetch journal history' });
   }
 });
 
