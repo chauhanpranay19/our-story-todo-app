@@ -20,6 +20,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '.')));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
+
 // Database connection
 const pool = new Pool({
   connectionString: 'postgresql://neondb_owner:npg_LRoBpjJvz01h@ep-tiny-thunder-aech14yn-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require'
@@ -213,10 +219,47 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Health check endpoint for Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Catch-all route for debugging
+app.get('*', (req, res) => {
+  console.log('Received request for:', req.url);
+  res.status(404).json({ error: 'Not found', path: req.url });
+});
+
 // Initialize database and start server
 initializeDatabase().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`App available at: http://0.0.0.0:${PORT}`);
+    console.log('Health check available at: /health');
   });
+  
+  // Error handling for server
+  server.on('error', (error) => {
+    console.error('Server error:', error);
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use`);
+    }
+  });
+  
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
+}).catch((error) => {
+  console.error('Failed to initialize database:', error);
+  process.exit(1);
 }); 
