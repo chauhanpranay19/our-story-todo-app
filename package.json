@@ -1,0 +1,17 @@
+{
+  "name": "our-story-todo-app",
+  "version": "1.0.0",
+  "description": "A beautiful couples todo app with PostgreSQL backend",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "cd backend && npm install && npm start",
+    "build": "cd backend && npm install",
+    "dev": "cd backend && npm run dev"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": ["todo", "couples", "postgresql", "neon", "express"],
+  "author": "Pranay Chauhan",
+  "license": "MIT"
+} 
