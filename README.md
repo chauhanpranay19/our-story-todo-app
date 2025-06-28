@@ -1,120 +1,201 @@
-# Our Story - Couples To-Do List App ❤️
+# Our Story - Couples Todo App ❤️
 
-A beautiful, interactive to-do list app designed for couples to track their bucket list, share memories, and journal together.
+A beautiful, modern todo app designed for couples to track their bucket list, share memories, and journal together. Features a dark theme with animated hearts, password protection, and media upload capabilities.
 
-## Features
+## ✨ Features
 
-- **Bucket List Management**: Add, complete, and track shared dreams
-- **Photo Memories**: Upload photos when completing tasks
-- **Journal Entries**: Daily prompts for both partners to share thoughts
-- **Photo Gallery**: Slideshow of completed memories
-- **Beautiful UI**: Dark theme with animated hearts and smooth transitions
-- **Cloud Storage**: Data persists across devices using JSONBin
-- **Responsive Design**: Works on desktop and mobile
+- **📝 Bucket List Management**: Add, edit, and track your shared goals
+- **✅ Task Completion**: Mark tasks as done with photos/videos
+- **🔄 Smart Reordering**: Rearrange your bucket list with ease
+- **📸 Memory Gallery**: View all your completed tasks with media
+- **💭 Daily Journal**: Answer daily questions together
+- **🔒 Password Protection**: Keep your memories private
+- **📱 Mobile Responsive**: Works perfectly on all devices
+- **🎨 Beautiful UI**: Dark theme with animated hearts
+- **☁️ Cloud Storage**: Reliable image/video uploads via Cloudinary
 
-## Setup Instructions
+## 🚀 Live Demo
 
-### 1. Get API Keys
+**App URL**: https://our-story-todo-app.onrender.com  
+**Password**: Vish
 
-#### JSONBin (for data storage)
-1. Go to [JSONBin.io](https://jsonbin.io/)
-2. Create an account and get your API key
-3. Create a new bin (the URL will be your `JSONBIN_URL`)
+## 🛠️ Tech Stack
 
-#### ImgBB (for image uploads)
-1. Go to [ImgBB.com](https://imgbb.com/)
-2. Create an account and get your API key
+- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
+- **Backend**: Node.js, Express.js
+- **Database**: PostgreSQL (Neon)
+- **Image Upload**: Cloudinary
+- **Deployment**: Render
 
-### 2. Configure Environment Variables
+## 📋 Prerequisites
 
-For **Netlify deployment**, add these environment variables in your Netlify dashboard:
+- Node.js (v14 or higher)
+- PostgreSQL database (Neon recommended)
+- Cloudinary account (free tier)
 
-1. Go to your site's **Site settings** > **Environment variables**
-2. Add the following variables:
-   - `JSONBIN_URL`: Your JSONBin URL (e.g., `https://api.jsonbin.io/v3/b/YOUR_BIN_ID`)
-   - `JSONBIN_MASTER_KEY`: Your JSONBin master key
-   - `IMGBB_API_KEY`: Your ImgBB API key
+## 🔧 Environment Variables
 
-### 3. Deploy to Netlify
+Create a `.env` file in the root directory:
 
-#### Option A: Drag & Drop
-1. Zip the `todo` folder
-2. Go to [Netlify](https://netlify.com/)
-3. Drag and drop the zip file to deploy
+```env
+PORT=3000
+NODE_ENV=production
+DATABASE_URL=your_postgresql_connection_string
+```
 
-#### Option B: Git Integration
-1. Push your code to GitHub
-2. Connect your repository to Netlify
-3. Deploy automatically
+## ☁️ Cloudinary Setup
 
-### 4. Local Development
+1. **Create Account**: Sign up at [Cloudinary](https://cloudinary.com/)
+2. **Get Cloud Name**: Find your cloud name in the dashboard
+3. **Create Upload Preset**:
+   - Go to Settings → Upload
+   - Create a new upload preset
+   - Set it to "Unsigned" for client-side uploads
+   - Copy the preset name
 
-To run locally:
-1. Open `index.html` in a web browser
-2. Or use a local server: `python -m http.server 8000`
+4. **Update Configuration**: Update the constants in `index.html`:
+   ```javascript
+   const CLOUDINARY_CLOUD_NAME = "your_cloud_name";
+   const CLOUDINARY_UPLOAD_PRESET = "your_upload_preset";
+   ```
 
-## Security Notes
+## 🗄️ Database Setup
 
-⚠️ **Important**: The current version includes API keys in the client-side code for functionality. For production:
+The app uses PostgreSQL with these tables:
 
-1. **Move API keys to environment variables** (as shown in the setup)
-2. **Consider using a backend service** for better security
-3. **Implement proper authentication** for multi-user scenarios
+### Tasks Table
+```sql
+CREATE TABLE tasks (
+  id SERIAL PRIMARY KEY,
+  text TEXT NOT NULL,
+  done BOOLEAN DEFAULT FALSE,
+  image_url TEXT,
+  video_url TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-## Customization
+### Journal Table
+```sql
+CREATE TABLE journal (
+  id SERIAL PRIMARY KEY,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  author VARCHAR(10) NOT NULL,
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-### Changing the Theme
-Edit the CSS variables in the `:root` selector:
+## 🚀 Installation & Deployment
+
+### Local Development
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/our-story-todo-app.git
+   cd our-story-todo-app
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**:
+   ```bash
+   cp env-file.txt .env
+   # Edit .env with your database URL
+   ```
+
+4. **Start the server**:
+   ```bash
+   npm start
+   ```
+
+5. **Access the app**: http://localhost:3000
+
+### Production Deployment (Render)
+
+1. **Connect Repository**: Link your GitHub repo to Render
+2. **Configure Environment**:
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Environment Variables: Add your `DATABASE_URL`
+
+3. **Deploy**: Render will automatically deploy your app
+
+## 📱 Usage
+
+1. **Access the app** and enter the password: `Vish`
+2. **Add bucket list items** using the input field
+3. **Upload media** by clicking on any active task
+4. **Rearrange items** using the 🔄 button
+5. **View memories** in the Memories section
+6. **Journal together** in the Journal section
+
+## 🔒 Security Features
+
+- **Password Protection**: App requires password to access
+- **Secure Uploads**: Cloudinary handles file security
+- **Input Validation**: All inputs are sanitized
+- **CORS Protection**: Configured for production use
+
+## 🎨 Customization
+
+### Changing the Password
+Edit the `CORRECT_PASSWORD` constant in `index.html`:
+```javascript
+const CORRECT_PASSWORD = "YourNewPassword";
+```
+
+### Modifying the Theme
+Update CSS variables in the `:root` selector:
 ```css
 :root {
-    --dark-bg: #0d0000;
-    --primary-red: #ff6b6b;
-    --secondary-red: #ff8a8a;
-    /* ... other variables */
+  --primary-red: #ff6b6b;
+  --dark-bg: #0a0a0a;
+  /* ... other variables */
 }
 ```
 
-### Adding New Tasks
-Edit the `initialTasks` array in the JavaScript to add your own bucket list items.
+### Adding New Features
+The modular structure makes it easy to add new features:
+- Add new API endpoints in `server.js`
+- Create new UI sections in `index.html`
+- Extend the database schema as needed
 
-### Customizing Journal Questions
-Modify the `journalQuestions` array to add your own daily prompts.
+## 🐛 Troubleshooting
 
-## Browser Support
+### Upload Issues
+- Check Cloudinary configuration
+- Verify upload preset is set to "Unsigned"
+- Check file size limits (25MB for Cloudinary)
 
-- Chrome/Edge (recommended)
-- Firefox
-- Safari
-- Mobile browsers
+### Database Issues
+- Verify PostgreSQL connection string
+- Check database permissions
+- Ensure tables are created properly
 
-## Troubleshooting
+### Deployment Issues
+- Check environment variables in Render
+- Verify build and start commands
+- Check server logs for errors
 
-### Data Not Saving
-- Check your JSONBin API key and URL
-- Ensure the bin exists and is accessible
-- Check browser console for errors
+## 📄 License
 
-### Images Not Uploading
-- Verify your ImgBB API key
-- Check file size (max 5MB)
-- Ensure you're using a supported image format
+This project is open source and available under the [MIT License](LICENSE).
 
-### App Not Loading
-- Check all API keys are correct
-- Verify internet connection
-- Clear browser cache
+## 🤝 Contributing
 
-## License
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-This project is for personal use. Feel free to modify and use for your own relationship! ❤️
+## 📞 Support
 
-## Support
-
-If you encounter issues:
-1. Check the browser console for error messages
-2. Verify all API keys are correctly set
-3. Ensure your JSONBin and ImgBB accounts are active
+If you encounter any issues or have questions:
+1. Check the troubleshooting section
+2. Review the console logs for errors
+3. Open an issue on GitHub
 
 ---
 
-Made with ❤️ for couples to create beautiful memories together! 
+Made with ❤️ for couples everywhere 

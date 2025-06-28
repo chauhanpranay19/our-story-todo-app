@@ -1194,9 +1194,10 @@
         // Backend API URL (Render production URL)
         const API_BASE_URL = 'https://our-story-todo-app.onrender.com/api';
         
-        // ImgBB API Key for image uploads
-        const IMGBB_API_KEY = "f619480b90cd80a6646b3c8d95872705";
-
+        // Cloudinary configuration for image uploads
+        const CLOUDINARY_CLOUD_NAME = "dxtq8qj8q"; // Free cloud name
+        const CLOUDINARY_UPLOAD_PRESET = "ml_default"; // Public upload preset
+        
         // Password protection
         const CORRECT_PASSWORD = "Vish";
 
@@ -1686,59 +1687,93 @@
             loadingText.innerText = ' Uploading...';
             li.querySelector('.task-content').appendChild(loadingText);
 
-            const formData = new FormData();
-            formData.append('image', file);
-
             try {
-                console.log('Uploading to ImgBB...');
-                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { 
-                    method: 'POST', 
-                    body: formData 
-                });
+                // Try Cloudinary first, fallback to base64 if it fails
+                let mediaUrl = null;
                 
-                console.log('ImgBB response status:', res.status);
-                
-                if (!res.ok) {
-                    throw new Error(`Upload failed: ${res.status}`);
-                }
-                
-                const json = await res.json();
-                console.log('ImgBB response:', json);
-                
-                if (json.success) {
-                    console.log('ImgBB upload successful, updating task...');
-                    // Update task in database
-                    const updateResponse = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            text: appData.tasks.find(t => t.id === taskId).text,
-                            done: true,
-                            imageUrl: json.data.url,
-                            videoUrl: file.type.startsWith('video/') ? json.data.url : null
-                        })
+                try {
+                    console.log('Trying Cloudinary upload...');
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                    formData.append('cloud_name', CLOUDINARY_CLOUD_NAME);
+                    
+                    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, { 
+                        method: 'POST', 
+                        body: formData 
                     });
                     
-                    console.log('Task update response status:', updateResponse.status);
+                    console.log('Cloudinary response status:', res.status);
                     
-                    if (updateResponse.ok) {
-                        const updatedTask = await updateResponse.json();
-                        console.log('Task updated successfully:', updatedTask);
-                        const taskIndex = appData.tasks.findIndex(t => t.id === taskId);
-                        appData.tasks[taskIndex] = updatedTask;
-                        renderAll();
-                        showNotification('Item completed! 🎉', 'info');
+                    if (res.ok) {
+                        const json = await res.json();
+                        console.log('Cloudinary response:', json);
+                        
+                        if (json.secure_url) {
+                            mediaUrl = json.secure_url;
+                            console.log('Cloudinary upload successful:', mediaUrl);
+                        } else {
+                            throw new Error('Cloudinary upload failed - no URL returned');
+                        }
                     } else {
-                        throw new Error('Failed to update task in database');
+                        const errorText = await res.text();
+                        throw new Error(`Cloudinary upload failed: ${res.status} - ${errorText}`);
                     }
-                } else {
-                    throw new Error(json.error?.message || 'Upload failed');
+                } catch (cloudinaryError) {
+                    console.warn('Cloudinary upload failed, falling back to base64:', cloudinaryError);
+                    
+                    // Fallback to base64 for smaller files
+                    const maxSize = 5 * 1024 * 1024; // 5MB
+                    
+                    if (file.size > maxSize) {
+                        throw new Error('File too large for fallback. Please try a smaller file or check your internet connection.');
+                    }
+
+                    // Convert file to base64
+                    mediaUrl = await fileToBase64(file);
+                    console.log('Using base64 fallback, size:', mediaUrl.length);
                 }
+                
+                // Update task in database
+                const updateResponse = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: appData.tasks.find(t => t.id === taskId).text,
+                        done: true,
+                        imageUrl: mediaUrl,
+                        videoUrl: file.type.startsWith('video/') ? mediaUrl : null
+                    })
+                });
+                
+                console.log('Task update response status:', updateResponse.status);
+                
+                if (updateResponse.ok) {
+                    const updatedTask = await updateResponse.json();
+                    console.log('Task updated successfully:', updatedTask);
+                    const taskIndex = appData.tasks.findIndex(t => t.id === taskId);
+                    appData.tasks[taskIndex] = updatedTask;
+                    renderAll();
+                    showNotification('Item completed! 🎉', 'info');
+                } else {
+                    throw new Error('Failed to update task in database');
+                }
+                
             } catch(error) {
                 console.error("Media upload failed:", error);
                 loadingText.innerText = " Upload Failed";
-                showNotification('Failed to upload media. Please try again.', 'error');
+                showNotification(`Upload failed: ${error.message}`, 'error');
             }
+        }
+
+        // Helper function to convert file to base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
         }
         
         // --- Photo Memories & Slideshow ---
