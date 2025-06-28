@@ -232,10 +232,8 @@
     
     <script>
         // --- CONFIGURATION ---
-        // Backend API URL (will be localhost for development, your domain for production)
-        const API_BASE_URL = window.location.hostname === 'localhost' 
-            ? 'http://localhost:3000/api' 
-            : '/api';
+        // Backend API URL (Railway production URL)
+        const API_BASE_URL = 'https://our-story-todo-app-production.up.railway.app/api';
         
         // ImgBB API Key for image uploads
         const IMGBB_API_KEY = "f619480b90cd80a6646b3c8d95872705";
