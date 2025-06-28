@@ -612,34 +612,150 @@
         /* Mobile reorder buttons */
         .mobile-reorder {
             display: none;
-            flex-direction: column;
-            gap: 2px;
             margin-right: 8px;
         }
 
-        .mobile-reorder button {
+        .rearrange-btn {
             background: none;
             border: none;
-            font-size: 1rem;
+            font-size: 1.2rem;
             cursor: pointer;
-            padding: 2px;
-            border-radius: 2px;
+            padding: 4px 8px;
+            border-radius: 4px;
             color: var(--muted-text);
             transition: var(--transition);
+            opacity: 0.7;
         }
 
-        .mobile-reorder button:hover {
+        .rearrange-btn:hover {
+            color: var(--primary-red);
+            opacity: 1;
+        }
+
+        /* Rearrange mode styles */
+        .rearrange-mode {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .rearrange-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            color: var(--light-text);
+        }
+
+        .rearrange-header h3 {
+            color: var(--primary-red);
+            font-size: 1.5rem;
+        }
+
+        .rearrange-close {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            color: var(--muted-text);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .rearrange-close:hover {
             color: var(--primary-red);
         }
 
-        /* Show mobile reorder on mobile devices */
+        .rearrange-list {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .rearrange-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: move;
+            transition: var(--transition);
+        }
+
+        .rearrange-item:hover {
+            border-color: var(--primary-red);
+            transform: translateX(4px);
+        }
+
+        .rearrange-item.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+        }
+
+        .rearrange-handle {
+            font-size: 1.5rem;
+            margin-right: 12px;
+            color: var(--muted-text);
+        }
+
+        .rearrange-text {
+            flex: 1;
+            color: var(--light-text);
+        }
+
+        .rearrange-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .rearrange-btn-primary {
+            background: linear-gradient(135deg, var(--primary-red), var(--secondary-red));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .rearrange-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+        }
+
+        .rearrange-btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--light-text);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .rearrange-btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Show rearrange button on mobile devices */
         @media (max-width: 768px) {
-            .drag-handle {
-                display: none;
-            }
-            
             .mobile-reorder {
-                display: flex;
+                display: block;
             }
         }
 
@@ -1257,12 +1373,15 @@
 
                 if (task.done) {
                     li.classList.add('done');
+                    const taskIndex = appData.tasks.findIndex(t => t.id === task.id);
+                    const isFirst = taskIndex === 0;
+                    const isLast = taskIndex === appData.tasks.length - 1;
+                    
                     li.innerHTML = `
                         <div class="task-list-item-top">
                             <div class="task-content">
                                 <div class="mobile-reorder">
-                                    <button class="move-up" title="Move up">⬆️</button>
-                                    <button class="move-down" title="Move down">⬇️</button>
+                                    <button class="rearrange-btn" title="Rearrange">🔄</button>
                                 </div>
                                 <span class="task-text">${escapeHtml(task.text)}</span>
                             </div>
@@ -1273,44 +1392,6 @@
                             </div>
                         </div>
                     `;
-                    
-                    // Add mobile reorder functionality
-                    const moveUpBtn = li.querySelector('.move-up');
-                    const moveDownBtn = li.querySelector('.move-down');
-                    
-                    moveUpBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        moveTaskUp(task.id);
-                    });
-                    
-                    moveDownBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        moveTaskDown(task.id);
-                    });
-                    
-                    // Add media content
-                    if (task.image_url) {
-                        const img = document.createElement('img');
-                        img.src = task.image_url; 
-                        img.className = 'task-image';
-                        img.onerror = () => {
-                            img.style.display = 'none';
-                            console.warn('Failed to load image:', task.image_url);
-                        };
-                        li.appendChild(img);
-                    }
-                    
-                    if (task.video_url) {
-                        const video = document.createElement('video');
-                        video.src = task.video_url;
-                        video.className = 'task-video';
-                        video.controls = true;
-                        video.onerror = () => {
-                            video.style.display = 'none';
-                            console.warn('Failed to load video:', task.video_url);
-                        };
-                        li.appendChild(video);
-                    }
                     
                     // Add edit functionality
                     li.querySelector('.edit-btn').addEventListener('click', (e) => {
@@ -1342,12 +1423,15 @@
                     
                     completedListEl.prepend(li);
                 } else {
+                    const taskIndex = appData.tasks.findIndex(t => t.id === task.id);
+                    const isFirst = taskIndex === 0;
+                    const isLast = taskIndex === appData.tasks.length - 1;
+                    
                     li.innerHTML = `
                         <div class="task-list-item-top">
                             <div class="task-content">
                                 <div class="mobile-reorder">
-                                    <button class="move-up" title="Move up">⬆️</button>
-                                    <button class="move-down" title="Move down">⬇️</button>
+                                    <button class="rearrange-btn" title="Rearrange">🔄</button>
                                 </div>
                                 <span class="task-text">${escapeHtml(task.text)}</span>
                             </div>
@@ -1358,18 +1442,11 @@
                         </div>
                     `;
                     
-                    // Add mobile reorder functionality
-                    const moveUpBtn = li.querySelector('.move-up');
-                    const moveDownBtn = li.querySelector('.move-down');
-                    
-                    moveUpBtn.addEventListener('click', (e) => {
+                    // Add rearrange functionality
+                    const rearrangeBtn = li.querySelector('.rearrange-btn');
+                    rearrangeBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        moveTaskUp(task.id);
-                    });
-                    
-                    moveDownBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        moveTaskDown(task.id);
+                        openRearrangeMode();
                     });
                     
                     // Add edit functionality
@@ -1394,6 +1471,31 @@
                             completeTaskWithMedia(task.id, file, li);
                         }
                     });
+                    
+                    // Add media content
+                    if (task.image_url) {
+                        const img = document.createElement('img');
+                        img.src = task.image_url; 
+                        img.className = 'task-image';
+                        img.onerror = () => {
+                            img.style.display = 'none';
+                            console.warn('Failed to load image:', task.image_url);
+                        };
+                        li.appendChild(img);
+                    }
+                    
+                    if (task.video_url) {
+                        const video = document.createElement('video');
+                        video.src = task.video_url;
+                        video.className = 'task-video';
+                        video.controls = true;
+                        video.onerror = () => {
+                            video.style.display = 'none';
+                            console.warn('Failed to load video:', task.video_url);
+                        };
+                        li.appendChild(video);
+                    }
+                    
                     todoListEl.append(li);
                 }
                 
@@ -1794,35 +1896,121 @@
             });
         }
 
-        // --- MOBILE REORDERING FUNCTIONALITY ---
-        async function moveTaskUp(taskId) {
-            const currentIndex = appData.tasks.findIndex(t => t.id === taskId);
-            if (currentIndex > 0) {
-                // Swap with previous task
-                const temp = appData.tasks[currentIndex];
-                appData.tasks[currentIndex] = appData.tasks[currentIndex - 1];
-                appData.tasks[currentIndex - 1] = temp;
-                
-                // Update order in database
-                await updateTaskOrder();
-                renderTasks();
-                showNotification('Task moved up! ⬆️', 'info');
+        // --- ERROR RECOVERY ---
+        async function recoverFromError() {
+            console.log('Attempting to recover from error...');
+            try {
+                await loadData();
+                showNotification('List recovered! 🔄', 'info');
+            } catch (error) {
+                console.error('Recovery failed:', error);
+                showNotification('Recovery failed. Please refresh the page.', 'error');
             }
         }
 
-        async function moveTaskDown(taskId) {
-            const currentIndex = appData.tasks.findIndex(t => t.id === taskId);
-            if (currentIndex < appData.tasks.length - 1) {
-                // Swap with next task
-                const temp = appData.tasks[currentIndex];
-                appData.tasks[currentIndex] = appData.tasks[currentIndex + 1];
-                appData.tasks[currentIndex + 1] = temp;
+        // --- REARRANGE FUNCTIONALITY ---
+        function openRearrangeMode() {
+            // Create rearrange mode overlay
+            const rearrangeOverlay = document.createElement('div');
+            rearrangeOverlay.className = 'rearrange-mode';
+            rearrangeOverlay.innerHTML = `
+                <div class="rearrange-header">
+                    <h3>Rearrange Bucket List</h3>
+                    <button class="rearrange-close">&times;</button>
+                </div>
+                <div class="rearrange-list" id="rearrange-list">
+                    ${appData.tasks.map((task, index) => `
+                        <div class="rearrange-item" data-task-id="${task.id}" draggable="true">
+                            <span class="rearrange-handle">⋮⋮</span>
+                            <span class="rearrange-text">${escapeHtml(task.text)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="rearrange-actions">
+                    <button class="rearrange-btn-secondary" id="cancel-rearrange">Cancel</button>
+                    <button class="rearrange-btn-primary" id="save-rearrange">Save Order</button>
+                </div>
+            `;
+            
+            document.body.appendChild(rearrangeOverlay);
+            
+            // Set up drag and drop for rearrange
+            const rearrangeList = document.getElementById('rearrange-list');
+            let draggedItem = null;
+            
+            // Drag events for each item
+            const rearrangeItems = rearrangeList.querySelectorAll('.rearrange-item');
+            rearrangeItems.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedItem = item;
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
                 
-                // Update order in database
-                await updateTaskOrder();
-                renderTasks();
-                showNotification('Task moved down! ⬇️', 'info');
-            }
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('dragging');
+                    draggedItem = null;
+                });
+            });
+            
+            // Drop zone events
+            rearrangeList.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                const afterElement = getDragAfterElement(rearrangeList, e.clientY);
+                const draggable = document.querySelector('.dragging');
+                
+                if (afterElement == null) {
+                    rearrangeList.appendChild(draggable);
+                } else {
+                    rearrangeList.insertBefore(draggable, afterElement);
+                }
+            });
+            
+            // Close button
+            rearrangeOverlay.querySelector('.rearrange-close').addEventListener('click', () => {
+                document.body.removeChild(rearrangeOverlay);
+            });
+            
+            // Cancel button
+            rearrangeOverlay.querySelector('#cancel-rearrange').addEventListener('click', () => {
+                document.body.removeChild(rearrangeOverlay);
+            });
+            
+            // Save button
+            rearrangeOverlay.querySelector('#save-rearrange').addEventListener('click', async () => {
+                const newOrder = Array.from(rearrangeList.querySelectorAll('.rearrange-item'))
+                    .map(item => item.getAttribute('data-task-id'));
+                
+                try {
+                    // Update the order in the app data
+                    const newTasks = [];
+                    newOrder.forEach(taskId => {
+                        const task = appData.tasks.find(t => t.id == taskId);
+                        if (task) newTasks.push(task);
+                    });
+                    appData.tasks = newTasks;
+                    
+                    // Update order in database
+                    await updateTaskOrder();
+                    renderTasks();
+                    showNotification('Order saved successfully! ✨', 'info');
+                    document.body.removeChild(rearrangeOverlay);
+                } catch (error) {
+                    console.error('Error saving order:', error);
+                    showNotification('Failed to save order. Please try again.', 'error');
+                }
+            });
+            
+            // Escape key to close
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.body.removeChild(rearrangeOverlay);
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
         }
 
     </script>
